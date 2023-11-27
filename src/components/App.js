@@ -1,4 +1,3 @@
-import { Component } from 'react';
 import { Search } from './SearchBar/Searchbar';
 import { FetchImages } from 'api';
 import { ImageGallery } from './ImageGallery/ImageGallery';
@@ -7,87 +6,68 @@ import { AppSection } from './App.styled';
 import { Button } from './LoadMoreBtn/Button';
 import { Loader } from './Loader/Loader';
 import toast, { Toaster } from 'react-hot-toast';
+import { useEffect, useState } from 'react';
 
-export class App extends Component {
-  state = {
-    query: '',
-    images: [],
-    totalImages: 0,
-    page: 1,
-    key: Date.now(),
-    isLoading: false,
-  };
+export const App = () => {
+  const [query, setQuery] = useState('');
+  const [images, setImages] = useState([]);
+  const [totalImages, setTotalImages] = useState(0);
+  const [page, setPage] = useState(1);
+  const [key, setKey] = useState(Date.now());
+  const [isLoading, setIsLoading] = useState(false);
 
-  async componentDidUpdate(prevProps, prevState) {
-    if (
-      prevState.query !== this.state.query ||
-      prevState.page !== this.state.page ||
-      prevState.key !== this.state.key
-    ) {
+  useEffect(() => {
+    if (!query.trim()) {
+      return;
+    }
+    async function getImages() {
       try {
-        this.setState({ isLoading: true });
-        const fetchedImages = await FetchImages(
-          this.state.query,
-          this.state.page
-        );
+        setIsLoading(true);
+        const fetchedImages = await FetchImages(query, page);
 
         if (fetchedImages.total === 0) {
-          toast.error(`There is no pictures on query '${this.state.query}'`);
+          toast.error(`There is no pictures on query '${query}'`);
           return;
         }
 
-        this.state.page === 1
-          ? this.setState({
-              images: [...fetchedImages.hits],
-              totalImages: fetchedImages.total,
-            })
-          : this.setState({
-              images: [...prevState.images, ...fetchedImages.hits],
-              totalImages: fetchedImages.total,
-            });
+        page === 1
+          ? setImages([...fetchedImages.hits])
+          : setImages(prevImages => [...prevImages, ...fetchedImages.hits]);
+        setTotalImages(fetchedImages.total);
       } catch (error) {
         toast.error(`ERROR loading images ${error}`);
       } finally {
-        this.setState({ isLoading: false });
+        setIsLoading(false);
       }
     }
-  }
 
-  handleSubmit = newQuery => {
+    getImages();
+  }, [query, page, key]);
+
+  const handleSubmit = newQuery => {
     if (!newQuery.trim()) {
       return toast.error('Search query can not be empty');
     }
 
-    this.setState({
-      query: `${newQuery}`,
-      images: [],
-      totalImages: 0,
-      page: 1,
-      key: Date.now(),
-    });
+    setQuery(`${newQuery}`);
+    setImages([]);
+    setTotalImages(0);
+    setPage(1);
+    setKey(Date.now());
   };
 
-  handleLoadMore = () => {
-    this.setState(prevState => {
-      return {
-        page: prevState.page + 1,
-      };
-    });
+  const handleLoadMore = () => {
+    setPage(prevPage => prevPage + 1);
   };
 
-  render() {
-    const { handleSubmit, handleLoadMore } = this;
-    const { images, isLoading, totalImages } = this.state;
-
-    return (
-      <AppSection>
-        <Search onSubmitSearch={handleSubmit} />
-        {images.length > 0 && <ImageGallery images={images} />}
-        {isLoading && <Loader />}
-        {totalImages - images.length > 0 && <Button onClick={handleLoadMore} />}
-        <GlobalStyle />
-        <Toaster />
-      </AppSection>
-    );
-  }
-}
+  return (
+    <AppSection>
+      <Search onSubmitSearch={handleSubmit} />
+      {images.length > 0 && <ImageGallery images={images} />}
+      {isLoading && <Loader />}
+      {totalImages - images.length > 0 && <Button onClick={handleLoadMore} />}
+      <GlobalStyle />
+      <Toaster />
+    </AppSection>
+  );
+};
